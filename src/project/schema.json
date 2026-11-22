@@ -1,0 +1,23 @@
+[
+  "CREATE TABLE `project` (\n\t`id` integer PRIMARY KEY NOT NULL,\n\t`goal` text NOT NULL,\n\t`constraints` text DEFAULT '[]' NOT NULL,\n\tCONSTRAINT \"project_singleton\" CHECK(\"project\".\"id\" = 1)\n);\n",
+  "CREATE TABLE `milestones` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`objective` text NOT NULL,\n\t`status` text NOT NULL,\n\t`dependencies` text DEFAULT '[]' NOT NULL\n);\n",
+  "CREATE TABLE `tasks` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`milestone` text NOT NULL,\n\t`revision` integer NOT NULL,\n\t`spec` text NOT NULL,\n\t`status` text NOT NULL,\n\t`result` text,\n\t`position` integer DEFAULT 0 NOT NULL,\n\tFOREIGN KEY (`milestone`) REFERENCES `milestones`(`id`) ON UPDATE no action ON DELETE no action\n);\n",
+  "CREATE TABLE `history` (\n\t`seq` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t`at` integer NOT NULL,\n\t`session` text NOT NULL,\n\t`kind` text NOT NULL,\n\t`subject` text NOT NULL,\n\t`payload` text NOT NULL\n);\n",
+  "CREATE INDEX `history_subject` ON `history` (`subject`,`seq`);",
+  "CREATE TABLE `activity` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`task` text NOT NULL,\n\t`revision` integer,\n\t`run` text NOT NULL,\n\t`parent` text,\n\t`actor` text NOT NULL,\n\t`kind` text NOT NULL,\n\t`title` text NOT NULL,\n\t`started` integer NOT NULL,\n\t`ended` integer,\n\t`status` text NOT NULL,\n\t`input` text,\n\t`output` text\n);\n",
+  "CREATE INDEX `activity_task` ON `activity` (`task`,`started`);",
+  "CREATE TABLE `writes` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`task` text NOT NULL,\n\t`revision` integer NOT NULL,\n\t`path` text NOT NULL,\n\t`before_hash` text,\n\t`after_hash` text NOT NULL,\n\t`status` text NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`description` text DEFAULT '' NOT NULL,\n\t`operation_id` text\n);\n",
+  "CREATE INDEX `writes_created` ON `writes` (`created_at`);",
+  "CREATE TABLE `workspaces` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`data` text NOT NULL\n);\n",
+  "CREATE TABLE `lease` (\n\t`id` integer PRIMARY KEY NOT NULL,\n\t`owner` text NOT NULL,\n\t`pid` integer NOT NULL,\n\tCONSTRAINT \"lease_singleton\" CHECK(\"lease\".\"id\" = 1)\n);\n",
+  "CREATE TABLE `main_responses` (\n\t`session` text NOT NULL,\n\t`timestamp` integer NOT NULL,\n\t`text` text NOT NULL,\n\t`metadata` text NOT NULL,\n\t`issue` text,\n\tPRIMARY KEY(`session`, `timestamp`)\n);\n",
+  "CREATE TABLE `command_runs` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`task` text NOT NULL,\n\t`revision` integer NOT NULL,\n\t`started` integer NOT NULL,\n\t`ended` integer,\n\t`cwd` text NOT NULL,\n\t`command` text NOT NULL,\n\t`status` text NOT NULL,\n\t`exit_code` integer,\n\t`signal` text\n);\n",
+  "CREATE INDEX `command_task` ON `command_runs` (`task`,`revision`,`started`);",
+  "CREATE TABLE `command_logs` (\n\t`seq` integer PRIMARY KEY AUTOINCREMENT NOT NULL,\n\t`run` text NOT NULL,\n\t`stream` text NOT NULL,\n\t`text` text NOT NULL,\n\tFOREIGN KEY (`run`) REFERENCES `command_runs`(`id`) ON UPDATE no action ON DELETE no action\n);\n",
+  "CREATE INDEX `command_log_run` ON `command_logs` (`run`,`seq`);",
+  "CREATE TABLE `directory_changes` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`task` text NOT NULL,\n\t`revision` integer NOT NULL,\n\t`path` text NOT NULL,\n\t`status` text NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`description` text NOT NULL\n);\n",
+  "CREATE TABLE `preferences` (\n\t`key` text PRIMARY KEY NOT NULL,\n\t`value` text NOT NULL\n);\n",
+  "CREATE TABLE `work_state` (\n\t`id` integer PRIMARY KEY NOT NULL,\n\t`selected` text,\n\t`source_epoch` integer DEFAULT 0 NOT NULL,\n\t`run` text,\n\tFOREIGN KEY (`selected`) REFERENCES `tasks`(`id`) ON UPDATE no action ON DELETE no action,\n\tCONSTRAINT \"state_singleton\" CHECK(\"work_state\".\"id\" = 1)\n);\n",
+  "CREATE TABLE `check_definitions` (\n\t`name` text PRIMARY KEY NOT NULL,\n\t`definition` text NOT NULL\n);\n",
+  "CREATE TABLE `check_results` (\n\t`run` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`definition` text NOT NULL,\n\t`source_epoch` integer NOT NULL,\n\t`status` text NOT NULL,\n\tFOREIGN KEY (`run`) REFERENCES `command_runs`(`id`) ON UPDATE no action ON DELETE no action\n);\n"
+]

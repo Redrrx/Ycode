@@ -1,0 +1,9 @@
+{
+  "worker": { "model": "" },
+  "decision": { "model": "" },
+  "summarizer": { "model": "" },
+  "limits": {
+    "workerTimeoutSeconds": 600,
+    "summarizerTimeoutSeconds": 600
+  }
+}

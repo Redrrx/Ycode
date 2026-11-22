@@ -1,0 +1,88 @@
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { registerActivityInspector } from "./activity/inspect.ts";
+import { createActivityLog } from "./activity/log.ts";
+import { registerActivityRenderer } from "./activity/renderer.ts";
+import { loadConfig } from "./config/load.ts";
+import {
+  mainResponse,
+  mainResponseText,
+  registerMainGuards,
+  reportSetupError,
+} from "./runtime/main.ts";
+import { registerRoleProviders } from "./runtime/providers.ts";
+import { registerRoleCommand } from "./runtime/role-command.ts";
+import { registerSummarizer } from "./runtime/summarizer-hooks.ts";
+import { registerUsageReports } from "./usage/report.ts";
+import { createWorkflowController } from "./workflow/controller.ts";
+export default async function ycode(pi: ExtensionAPI) {
+  const config = await loadConfig();
+  const decisionSetupIssue = registerRoleProviders(pi, config);
+  const activity = createActivityLog(pi);
+  const controller = createWorkflowController(pi, config, activity);
+  registerActivityRenderer(pi, activity);
+  registerActivityInspector(pi, activity, () => controller.getChangeHistory());
+  registerUsageReports(pi, activity);
+  registerMainGuards(pi, controller);
+  registerSummarizer(pi, activity, () => controller.getRoleConfiguration());
+
+  const showRoles = (context: ExtensionContext) => {
+    if (context.hasUI) {
+      const { worker, summarizer, decision } = controller.getRoleConfiguration();
+      context.ui.setStatus(
+        "roles",
+        `Main: ${context.model?.id ?? "not selected"} · Worker: ${worker.model || "not selected"} (${worker.effort ?? "effort unset"}) · Decision: ${decision.model || "not selected"}${decisionSetupIssue ? " (unavailable)" : ""} · Summarizer: ${summarizer.model || "not selected"} (${summarizer.effort ?? "effort unset"})`,
+      );
+    }
+  };
+  registerRoleCommand(pi, controller, showRoles, "worker");
+  registerRoleCommand(pi, controller, showRoles, "summarizer");
+  pi.on("model_select", (_event, context) => showRoles(context));
+  pi.on("session_start", async (_event, context) => {
+    pi.setActiveTools([]);
+    try {
+      activity.restore(context);
+      await controller.openProject(context);
+      controller.restore();
+    } catch (error) {
+      reportSetupError(pi, error);
+    }
+    if (decisionSetupIssue) {
+      reportSetupError(pi, decisionSetupIssue);
+    }
+    showRoles(context);
+  });
+  pi.on("session_tree", (_event, context) => {
+    controller.restore();
+    try {
+      activity.restore(context);
+    } catch (error) {
+      reportSetupError(pi, error);
+    }
+  });
+  pi.on("agent_settled", (event) => {
+    controller.pauseRun(
+      event.aborted ? "Execution cancelled; resume explicitly" : "Run paused; resume explicitly",
+    );
+  });
+  pi.on("session_shutdown", async () => {
+    await controller.dispose();
+  });
+  pi.on("message_end", (event) => {
+    if (event.message.role !== "assistant") {
+      return;
+    }
+    const text = event.message.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("\n");
+    controller.captureResponse(event.message.timestamp, text, event.message);
+    return { message: mainResponse(event.message, Boolean(controller.getPendingReview())) };
+  });
+  pi.on("turn_end", (event, context) => controller.handleTurn(event, context));
+  pi.registerMarkdownTransformer((markdown, context) => {
+    if (context.messageType !== "assistant") {
+      return markdown;
+    }
+    return context.isStreaming ? "" : mainResponseText(markdown);
+  });
+}
