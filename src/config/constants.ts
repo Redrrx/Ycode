@@ -94,7 +94,7 @@ export function requireEffort(
 ): WorkerEffort {
   const levels = getSupportedThinkingLevels(model);
   if (!selected || !levels.includes(selected)) {
-    throw new Error(`Set /${role} effort to one of: ${levels.join(", ")}.`);
+    throw new Error(`Use /effort <level> ${role}. Supported: ${levels.join(", ")}.`);
   }
   return selected;
 }

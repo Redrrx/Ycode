@@ -10,13 +10,13 @@ import {
   reportSetupError,
 } from "./runtime/main.ts";
 import { registerRoleProviders } from "./runtime/providers.ts";
-import { registerRoleCommand } from "./runtime/role-command.ts";
+import { registerRoleCommands } from "./runtime/role-command.ts";
 import { registerSummarizer } from "./runtime/summarizer-hooks.ts";
 import { registerUsageReports } from "./usage/report.ts";
 import { createWorkflowController } from "./workflow/controller.ts";
 export default async function ycode(pi: ExtensionAPI) {
   const config = await loadConfig();
-  const decisionSetupIssue = registerRoleProviders(pi, config);
+  registerRoleProviders(pi, config);
   const activity = createActivityLog(pi);
   const controller = createWorkflowController(pi, config, activity);
   registerActivityRenderer(pi, activity);
@@ -30,12 +30,11 @@ export default async function ycode(pi: ExtensionAPI) {
       const { worker, summarizer, decision } = controller.getRoleConfiguration();
       context.ui.setStatus(
         "roles",
-        `Main: ${context.model?.id ?? "not selected"} · Worker: ${worker.model || "not selected"} (${worker.effort ?? "effort unset"}) · Decision: ${decision.model || "not selected"}${decisionSetupIssue ? " (unavailable)" : ""} · Summarizer: ${summarizer.model || "not selected"} (${summarizer.effort ?? "effort unset"})`,
+        `Main: ${context.model?.id ?? "not selected"} · Worker: ${worker.model || "not selected"} (${worker.effort ?? "effort unset"}) · Decision: ${decision.model || "not selected"} · Summarizer: ${summarizer.model || "not selected"} (${summarizer.effort ?? "effort unset"})`,
       );
     }
   };
-  registerRoleCommand(pi, controller, showRoles, "worker");
-  registerRoleCommand(pi, controller, showRoles, "summarizer");
+  registerRoleCommands(pi, controller, showRoles);
   pi.on("model_select", (_event, context) => showRoles(context));
   pi.on("session_start", async (_event, context) => {
     pi.setActiveTools([]);
@@ -45,9 +44,6 @@ export default async function ycode(pi: ExtensionAPI) {
       controller.restore();
     } catch (error) {
       reportSetupError(pi, error);
-    }
-    if (decisionSetupIssue) {
-      reportSetupError(pi, decisionSetupIssue);
     }
     showRoles(context);
   });

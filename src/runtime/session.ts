@@ -88,7 +88,7 @@ export async function createWorker(
   revision = 1,
 ) {
   if (!config.worker.model) {
-    throw new Error("Set worker.model in config.json and /reload before starting a task.");
+    throw new Error("Choose a model with /login worker before starting a task.");
   }
   const runtime = await workerRuntime(context, signal);
   const model = runtime.getModel("worker", config.worker.model);

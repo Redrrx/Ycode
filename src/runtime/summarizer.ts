@@ -35,7 +35,7 @@ export async function summarize(
   ]);
   signal.throwIfAborted();
   if (!config.summarizer.model) {
-    throw new Error("Set summarizer.model in config.json and /reload to enable summaries.");
+    throw new Error("Choose a model with /login summarizer to enable summaries.");
   }
   const model = context.modelRegistry.find("summarizer", config.summarizer.model);
   if (!model) {

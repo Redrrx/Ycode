@@ -30,6 +30,12 @@ Main gives an explicit verdict for that task and revision.
   | stop: no next task
 ```
 
+## When Decision helps
+
+If a search for the CSV writer turns up several files or references, Decision can rank which ones the Worker should inspect first. The Worker still reads the code. Reading a known path or searching for exact text does not call Decision.
+
+The decision model's choices are best-effort; misleading code can make them wrong.
+
 ## Where tokens go
 
 Main gets the Worker’s result and compact project state, not the full tool transcript. Worker gets its task, relevant prerequisites, and checks, not the whole backlog. Within a Worker request, an identical source excerpt can be replaced by a reference if the full copy is still in context. A later task may need to read that file again.
@@ -44,8 +50,6 @@ From the Ycode checkout:
 npm run setup
 ```
 
-Keep the checkout in place. Main uses your selected Pi model. The other roles start empty. In `config.json`, set `worker.model` and `summarizer.model` to the OpenRouter chat model IDs you choose. Set `decision.model` to a supported OpenRouter classifier ID, or leave it blank to skip Decision. You can also keep these choices in `~/.pi/agent/perspi/config.json` instead of editing the checkout.
-
-Start `pi` in your repo, or `/reload` after changing models. Run `/worker` and `/summarizer` to see supported effort levels. Set each with `/worker effort <level>` and `/summarizer effort <level>`, or set `effort` next to `model` in the config. Neither role runs without an explicit model and effort. Use `/login worker`, `/login summarizer`, and optionally `/login decision` for credentials.
-
-Ask for a task directly, as in the diagram. For larger changes, ask Main to **save a plan**. Saving runs nothing. Tell it which tasks to run and which edits and commands you authorize. Use `/activity` to see progress. After a restart, open the same repo and ask to resume.
+1. Start `pi` in your repo (or `/reload`). Run `/login worker` and `/login summarizer` to pick each model and enter its OpenRouter key. `/login decision` is optional.
+2. Set effort per project, for example `/effort high worker` and `/effort low summarizer`. `/worker` and `/summarizer` list supported levels.
+3. Ask for a task, or ask for a plan and say when to run it. Check progress with `/activity`.

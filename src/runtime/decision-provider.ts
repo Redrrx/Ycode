@@ -15,12 +15,11 @@ const additionalModel: ClassifierModel<ClassifierApi> = {
   compat: { imageInput: "state-image-urls", sendImageOptInHeader: false },
 };
 
-export function decisionModel(upstream: Provider, id: string) {
-  const catalogModel = upstream.getAllModels?.().find((model) => model.id === id);
-  if (catalogModel?.type === "classifier") {
-    return catalogModel;
-  }
-  return id === additionalModel.id ? structuredClone(additionalModel) : undefined;
+export function decisionModels(upstream: Provider) {
+  const models = upstream.getAllModels?.().filter((model) => model.type === "classifier") ?? [];
+  return models.some((model) => model.id === additionalModel.id)
+    ? models
+    : [...models, additionalModel];
 }
 
 export function decisionClassifier(upstream: Provider): NonNullable<Provider["classify"]> {
