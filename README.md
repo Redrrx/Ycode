@@ -44,10 +44,8 @@ This avoids repeating source and tool output. It does not guarantee a cheaper ru
 
 ## Install and use
 
-From the Ycode checkout:
-
 ```sh
-npm run setup
+pi install git:github.com/Redrrx/Ycode
 ```
 
 1. Start `pi` in your repo (or `/reload`). Run `/login worker` and `/login summarizer` to pick each model and enter its OpenRouter key. `/login decision` is optional.
