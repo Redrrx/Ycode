@@ -45,12 +45,16 @@ function workerResources(): ResourceLoader {
 
 async function workerRuntime(
   context: ExtensionContext,
+  config: RoleConfig,
   signal: AbortSignal,
 ): Promise<ModelRuntime> {
   const runtime = await ModelRuntime.create({ modelsPath: null, refreshOnCreate: false, signal });
 
   for (const role of ["worker", "decision"] as const) {
     signal.throwIfAborted();
+    if (role === "decision" && !config.decision.model) {
+      continue;
+    }
     const provider = context.modelRegistry.getProvider(role);
     const credentials = await context.modelRegistry
       .getProviderAuth(role)
@@ -90,7 +94,7 @@ export async function createWorker(
   if (!config.worker.model) {
     throw new Error("Choose a model with /login worker before starting a task.");
   }
-  const runtime = await workerRuntime(context, signal);
+  const runtime = await workerRuntime(context, config, signal);
   const model = runtime.getModel("worker", config.worker.model);
   if (!model) {
     throw new Error(`Worker model is unavailable: ${config.worker.model}`);

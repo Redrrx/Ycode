@@ -3,6 +3,7 @@ import { registerActivityInspector } from "./activity/inspect.ts";
 import { createActivityLog } from "./activity/log.ts";
 import { registerActivityRenderer } from "./activity/renderer.ts";
 import { loadConfig } from "./config/load.ts";
+import { registerLifecycle } from "./runtime/lifecycle.ts";
 import {
   mainResponse,
   mainResponseText,
@@ -22,11 +23,13 @@ export default async function ycode(pi: ExtensionAPI) {
   registerActivityRenderer(pi, activity);
   registerActivityInspector(pi, activity, () => controller.getChangeHistory());
   registerUsageReports(pi, activity);
-  registerMainGuards(pi, controller);
-  registerSummarizer(pi, activity, () => controller.getRoleConfiguration());
+  const lifecycle = registerLifecycle(pi, controller, activity);
+  const active = lifecycle.active;
+  registerMainGuards(pi, controller, active);
+  registerSummarizer(pi, activity, () => controller.getRoleConfiguration(), active);
 
   const showRoles = (context: ExtensionContext) => {
-    if (context.hasUI) {
+    if (lifecycle.enabled() && context.hasUI) {
       const { worker, summarizer, decision } = controller.getRoleConfiguration();
       context.ui.setStatus(
         "roles",
@@ -36,18 +39,11 @@ export default async function ycode(pi: ExtensionAPI) {
   };
   registerRoleCommands(pi, controller, showRoles);
   pi.on("model_select", (_event, context) => showRoles(context));
-  pi.on("session_start", async (_event, context) => {
-    pi.setActiveTools([]);
-    try {
-      activity.restore(context);
-      await controller.openProject(context);
-      controller.restore();
-    } catch (error) {
-      reportSetupError(pi, error);
-    }
-    showRoles(context);
-  });
+  pi.on("session_start", (_event, context) => showRoles(context));
   pi.on("session_tree", (_event, context) => {
+    if (!active()) {
+      return;
+    }
     controller.restore();
     try {
       activity.restore(context);
@@ -55,16 +51,8 @@ export default async function ycode(pi: ExtensionAPI) {
       reportSetupError(pi, error);
     }
   });
-  pi.on("agent_settled", (event) => {
-    controller.pauseRun(
-      event.aborted ? "Execution cancelled; resume explicitly" : "Run paused; resume explicitly",
-    );
-  });
-  pi.on("session_shutdown", async () => {
-    await controller.dispose();
-  });
   pi.on("message_end", (event) => {
-    if (event.message.role !== "assistant") {
+    if (!active() || event.message.role !== "assistant") {
       return;
     }
     const text = event.message.content
@@ -74,9 +62,15 @@ export default async function ycode(pi: ExtensionAPI) {
     controller.captureResponse(event.message.timestamp, text, event.message);
     return { message: mainResponse(event.message, Boolean(controller.getPendingReview())) };
   });
-  pi.on("turn_end", (event, context) => controller.handleTurn(event, context));
+  pi.on("turn_end", async (event, context) => {
+    if (!active()) {
+      return;
+    }
+    const result = await controller.handleTurn(event, context);
+    return active() ? result : undefined;
+  });
   pi.registerMarkdownTransformer((markdown, context) => {
-    if (context.messageType !== "assistant") {
+    if (!active() || context.messageType !== "assistant") {
       return markdown;
     }
     return context.isStreaming ? "" : mainResponseText(markdown);

@@ -34,8 +34,12 @@ export function registerSummarizer(
   pi: ExtensionAPI,
   activity: ActivityLog,
   configuration: () => RoleConfig,
+  enabled: () => boolean,
 ): void {
   pi.on("session_before_compact", async (event, context) => {
+    if (!enabled()) {
+      return;
+    }
     try {
       const input = compactionInput(event);
       const result = await summarize(
@@ -65,7 +69,11 @@ export function registerSummarizer(
     }
   });
   pi.on("session_before_tree", async (event, context) => {
-    if (!event.preparation.userWantsSummary || !event.preparation.entriesToSummarize.length) {
+    if (
+      !enabled() ||
+      !event.preparation.userWantsSummary ||
+      !event.preparation.entriesToSummarize.length
+    ) {
       return;
     }
     try {

@@ -1,7 +1,7 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { z } from "zod";
-import { SESSION_ENTRIES } from "../config/constants.ts";
+import { requireEffort, SESSION_ENTRIES } from "../config/constants.ts";
 import { parseProjectAction } from "../project/schema.ts";
 import { mainPrompt, reviewPrompt } from "../prompts.ts";
 import type { WorkflowController } from "../workflow/controller.ts";
@@ -54,6 +54,50 @@ export function reportSetupError(pi: ExtensionAPI, error: unknown): void {
   });
 }
 
+export function registerWorkerGuard(
+  pi: ExtensionAPI,
+  controller: WorkflowController,
+  enabled: () => boolean,
+  ready: () => boolean,
+): void {
+  pi.on("input", async (_event, context) => {
+    if (!enabled()) {
+      return;
+    }
+    const block = (message: string) => {
+      if (context.hasUI) {
+        context.ui.notify(message, "error");
+      } else {
+        reportSetupError(pi, message);
+      }
+      return { action: "handled" as const };
+    };
+    const { worker } = controller.getRoleConfiguration();
+    if (!worker.model) {
+      return block("Choose a Worker model with /login worker.");
+    }
+    if (!ready()) {
+      return block(
+        "Ycode storage is unavailable. Fix the startup error and /reload, or /unload ycode to use normal Pi.",
+      );
+    }
+    const model = context.modelRegistry.find("worker", worker.model);
+    if (!model) {
+      return block("Worker model unavailable. Run /login worker.");
+    }
+    try {
+      const credentials = await context.modelRegistry.getProviderAuth("worker");
+      if (!credentials?.auth.apiKey) {
+        return block("Missing Worker credentials. Run /login worker.");
+      }
+      requireEffort("worker", model, worker.effort);
+    } catch (error) {
+      return block(error instanceof Error ? error.message : String(error));
+    }
+    return undefined;
+  });
+}
+
 function stateSections(
   sections: Record<string, string | null> | undefined,
   project: unknown,
@@ -71,8 +115,15 @@ function stateSections(
   return result;
 }
 
-export function registerMainGuards(pi: ExtensionAPI, controller: WorkflowController): void {
+export function registerMainGuards(
+  pi: ExtensionAPI,
+  controller: WorkflowController,
+  enabled: () => boolean,
+): void {
   pi.on("before_agent_start", (event) => {
+    if (!enabled()) {
+      return;
+    }
     pi.setActiveTools([]);
     controller.startRequest();
 
@@ -81,6 +132,9 @@ export function registerMainGuards(pi: ExtensionAPI, controller: WorkflowControl
     event.systemPromptOptions.selectedTools = [];
   });
   pi.on("context_with_system", (event) => {
+    if (!enabled()) {
+      return;
+    }
     const lastSystem = event.messages.findLastIndex((message) => message.role === "system");
     const lastResult = event.messages.findLastIndex(
       (message) =>
@@ -122,8 +176,13 @@ export function registerMainGuards(pi: ExtensionAPI, controller: WorkflowControl
         ),
     };
   });
-  pi.on("tool_call", () => ({
-    block: true,
-    reason: "Main is tool-free. Delegate repository work through the workflow protocol.",
-  }));
+  pi.on("tool_call", () => {
+    if (!enabled()) {
+      return;
+    }
+    return {
+      block: true,
+      reason: "Main is tool-free. Delegate repository work through the workflow protocol.",
+    };
+  });
 }

@@ -51,3 +51,5 @@ pi install git:github.com/Redrrx/Ycode
 1. Start `pi` in your repo (or `/reload`). Run `/login worker` and `/login summarizer` to pick each model and enter its OpenRouter key. `/login decision` is optional.
 2. Set effort per project, for example `/effort high worker` and `/effort low summarizer`. `/worker` and `/summarizer` list supported levels.
 3. Ask for a task, or ask for a plan and say when to run it. Check progress with `/activity`.
+
+Extension usage is blocked until Worker is configured, Decision Model is optional and skipped when absent. Use `/unload ycode` to unload the extension and restore normal Pi tools for this session. `/reload` enables it again.

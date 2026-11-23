@@ -13,13 +13,11 @@ export function createTaskDecisionClient(
   signal: AbortSignal,
   unavailable = false,
 ): DecisionClient {
+  const model = config.decision.model
+    ? context.modelRegistry.findOfType("classifier", "decision", config.decision.model)
+    : undefined;
   const decisions = createDecisionClient(
     (input, requestSignal) => {
-      const model = context.modelRegistry.findOfType(
-        "classifier",
-        "decision",
-        config.decision.model,
-      );
       if (!model) {
         throw new Error(
           `Configured decision classifier is unavailable: decision/${config.decision.model}. Check provider registration and /login decision.`,
@@ -34,6 +32,6 @@ export function createTaskDecisionClient(
       constraints: taskSpec.constraints.join("\n").slice(0, 2000),
     },
   );
-  decisions.unavailable = unavailable || !config.decision.model;
+  decisions.unavailable = unavailable || !model;
   return decisions;
 }
