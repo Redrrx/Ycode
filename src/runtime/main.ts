@@ -3,6 +3,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { z } from "zod";
 import { requireEffort, SESSION_ENTRIES } from "../config/constants.ts";
 import { parseProjectAction } from "../project/schema.ts";
+import { inspectWorkspace, type WorkspaceFacts } from "../project/workspace.ts";
 import { mainPrompt, reviewPrompt } from "../prompts.ts";
 import type { WorkflowController } from "../workflow/controller.ts";
 import { stripWorkflow } from "../workflow/protocol.ts";
@@ -120,12 +121,14 @@ export function registerMainGuards(
   controller: WorkflowController,
   enabled: () => boolean,
 ): void {
-  pi.on("before_agent_start", (event) => {
+  let workspace: WorkspaceFacts | undefined;
+  pi.on("before_agent_start", async (event, context) => {
     if (!enabled()) {
       return;
     }
     pi.setActiveTools([]);
     controller.startRequest();
+    workspace = await inspectWorkspace(context.cwd);
 
     event.systemPromptOptions.customPrompt = mainPrompt();
     event.systemPromptOptions.forceSystemPrompt = undefined;
@@ -151,7 +154,7 @@ export function registerMainGuards(
         z.object({ stateRevision: z.number() }).safeParse(message.details).data?.stateRevision ===
           revision,
     );
-    const snapshot = controller.getProjectSnapshot();
+    const snapshot = controller.getProjectSnapshot(workspace);
     return {
       messages: event.messages
         .map((message, index) =>

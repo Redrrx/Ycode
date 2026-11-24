@@ -14,6 +14,7 @@ import type { TaskScheduler } from "../project/scheduler.ts";
 import { openTaskScheduler } from "../project/scheduler.ts";
 import { parseProjectAction, type ProjectTask } from "../project/schema.ts";
 import { openRun } from "../project/run.ts";
+import type { WorkspaceFacts } from "../project/workspace.ts";
 import type { WorkerExecutor } from "../runtime/worker.ts";
 import { createWorkerExecutor } from "../runtime/worker.ts";
 import type { TaskSpec } from "./protocol.ts";
@@ -68,7 +69,7 @@ function bindWorkflowController(self: WorkflowControllerData) {
     setEffort: workflowControllerSetEffort.bind(undefined, self),
     getChangeHistory: workflowControllerGetChangeHistory.bind(undefined, self),
     getProjectRevision: workflowControllerGetProjectRevision.bind(undefined, self),
-    getProjectSnapshot: workflowControllerGetProjectSnapshot.bind(undefined, self),
+    getProjectSnapshot: (workspace?: WorkspaceFacts) => self.project?.state.snapshot(workspace),
     captureResponse: workflowControllerCaptureResponse.bind(undefined, self),
     getPendingReview: workflowControllerGetPendingReview.bind(undefined, self),
     startRequest: workflowControllerStartRequest.bind(undefined, self),
@@ -122,10 +123,6 @@ function workflowControllerGetChangeHistory(self: WorkflowControllerData) {
 
 function workflowControllerGetProjectRevision(self: WorkflowControllerData) {
   return self.project?.state.revision();
-}
-
-function workflowControllerGetProjectSnapshot(self: WorkflowControllerData) {
-  return self.project?.state.snapshot();
 }
 
 function workflowControllerCaptureResponse(

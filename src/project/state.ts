@@ -8,6 +8,7 @@ import { serializeCheck } from "./schema.ts";
 import { tables } from "./tables.ts";
 import type { TaskStore } from "./tasks.ts";
 import { createVerificationStore } from "./verification.ts";
+import type { WorkspaceFacts } from "./workspace.ts";
 const PAGE_SIZE = 8;
 const active = (task: ProjectTask) => !["accepted", "stopped"].includes(task.status);
 const present = <T>(items: T[]) => (items.length ? items : undefined);
@@ -62,17 +63,27 @@ function projectStateHeader(self: ProjectStateData, task: ProjectTask) {
   };
 }
 
-function projectStateSnapshot(self: ProjectStateData) {
+function projectStateSnapshot(self: ProjectStateData, workspace?: WorkspaceFacts) {
   const current = self.tasks.selected();
   const selected = current && active(current) ? current : undefined;
-  const open = self.tasks
-    .tasks()
-    .filter((task) => active(task) && task.spec.kind !== "investigation");
+  const tasks = self.tasks.tasks();
+  const open = tasks.filter((task) => active(task) && task.spec.kind !== "investigation");
   const constraints = self.tasks.database.constraints();
   const checks = createVerificationStore(self.tasks.database).summary();
-  const pending = self.tasks.tasks().filter((task) => task.status === "finished");
+  const pending = tasks.filter((task) => task.status === "finished");
   const goal = self.tasks.database.goal() || undefined;
-  const snapshot = {
+  return {
+    revision: projectStateRevision(self),
+    workspace,
+    hasSavedWork: Boolean(
+      goal ||
+      tasks.length ||
+      self.tasks.database.orm
+        .select({ id: tables.milestones.id })
+        .from(tables.milestones)
+        .limit(1)
+        .get(),
+    ),
     run: runSummary(self.tasks),
     goal,
     constraints: present(constraints),
@@ -87,9 +98,6 @@ function projectStateSnapshot(self: ProjectStateData) {
       : present(open.slice(0, PAGE_SIZE).map((task) => projectStateHeader(self, task))),
     checks: present(checks),
   };
-  return Object.values(snapshot).some((value) => value !== undefined)
-    ? { revision: projectStateRevision(self), ...snapshot }
-    : undefined;
 }
 
 function projectStateInspect(self: ProjectStateData, request: z.infer<typeof stateRequestSchema>) {
